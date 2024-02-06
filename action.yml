@@ -16,5 +16,33 @@ runs:
     with:
       path: ~/.cache/pre-commit
       key: pre-commit-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
-  - run: pre-commit run --show-diff-on-failure --color=always ${{ inputs.extra_args }}
+  - run: |
+      printenv
+      
+      export GIT_TRACE=true
+      export GIT_CURL_VERBOSE=true
+      mkdir /tmp/bin
+      cat - <<EOF>/tmp/bin/git
+      #!/bin/sh
+
+      export GIT_TRACE=true
+      export GIT_CURL_VERBOSE=true
+      export GIT_CONFIG_GLOBAL=${GITHUB_WORKSPACE}/.git/config
+      
+      echo "Wrapped args: >>> \$@" >> /tmp/log
+      exec 2>>/tmp/git.log
+      exec /usr/bin/git "\$@"
+      EOF
+      chmod +x /tmp/bin/git
+      export PATH=/tmp/bin:${PATH}
+
+      echo "Wrapper: "
+      cat /tmp/bin/git
+      git --version || true
+      
+      pre-commit run --show-diff-on-failure --color=always ${{ inputs.extra_args }} || true
+
+      cat  /home/runner/.cache/pre-commit/pre-commit.log || true
+      cat /tmp/log || true
+      cat /tmp/git.log || true
     shell: bash
